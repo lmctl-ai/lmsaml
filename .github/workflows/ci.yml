@@ -33,7 +33,7 @@ jobs:
             goos: linux
             goarch: arm64
             target: lmsaml-linux-arm64
-          - os: macos-15-intel
+          - os: ubuntu-24.04
             name: macos-arm64
             goos: darwin
             goarch: arm64
