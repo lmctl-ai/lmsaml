@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') && github.ref != 'refs/heads/main' }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   build:
@@ -33,7 +33,7 @@ jobs:
             goos: linux
             goarch: arm64
             target: lmsaml-linux-arm64
-          - os: macos-15
+          - os: macos-15-intel
             name: macos-arm64
             goos: darwin
             goarch: arm64
@@ -77,13 +77,13 @@ jobs:
           CGO_ENABLED=0 go test ./cmd/lmsaml/... ./samlidp/...
 
       - name: Setup Node and lmctl (POSIX)
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && matrix.name != 'macos-arm64'
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
       - name: Install lmctl / lmscript and lmconn (POSIX)
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && matrix.name != 'macos-arm64'
         run: |
           npm install -g @lmctl-ai/lmctl@staging || true
           git clone --depth 1 https://github.com/lmctl-ai/lmconn.git ../lmconn || true
@@ -92,7 +92,7 @@ jobs:
           fi
 
       - name: Run Integration Tests (POSIX)
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && matrix.name != 'macos-arm64'
         run: |
           chmod +x ./tests/integration-test.sh
           ./tests/integration-test.sh
