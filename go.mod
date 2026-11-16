@@ -1,6 +1,6 @@
 module github.com/crewjam/saml
 
-go 1.25.0
+go 1.26
 
 require (
 	code.dny.dev/ssrf v0.3.0
@@ -12,4 +12,7 @@ require (
 	gotest.tools/v3 v3.5.2
 )
 
-require github.com/jonboulle/clockwork v0.5.0 // indirect
+require (
+	github.com/jonboulle/clockwork v0.5.0 // indirect
+	github.com/lmctl-ai/lmcode-go v0.6.39-0.20261116211630-947bdab80ffe // indirect
+)

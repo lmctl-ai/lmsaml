@@ -1,0 +1,159 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') && github.ref != 'refs/heads/main' }}
+
+jobs:
+  build:
+    name: build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            name: linux-x64
+            goos: linux
+            goarch: amd64
+            target: lmsaml-linux-x64
+          - os: ubuntu-24.04-arm
+            name: linux-arm64
+            goos: linux
+            goarch: arm64
+            target: lmsaml-linux-arm64
+          - os: macos-15
+            name: macos-arm64
+            goos: darwin
+            goarch: arm64
+            target: lmsaml-macos-arm64
+          - os: macos-15-intel
+            name: macos-x64
+            goos: darwin
+            goarch: amd64
+            target: lmsaml-macos-x64
+          - os: windows-2022
+            name: windows-x64
+            goos: windows
+            goarch: amd64
+            target: lmsaml-windows-x64.exe
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: false
+
+      - name: Build lmsaml static single binary
+        shell: bash
+        run: |
+          mkdir -p dist
+          ext=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then ext=".exe"; fi
+          CGO_ENABLED=0 GOOS="${{ matrix.goos }}" GOARCH="${{ matrix.goarch }}" \
+            go build -trimpath -o "lmsaml${ext}" ./cmd/lmsaml
+          cp "lmsaml${ext}" "dist/${{ matrix.target }}"
+
+      - name: Run Go unit tests
+        shell: bash
+        run: |
+          CGO_ENABLED=0 go test ./cmd/lmsaml/... ./samlidp/...
+
+      - name: Setup Node and lmctl (POSIX)
+        if: runner.os != 'Windows'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install lmctl / lmscript and lmconn (POSIX)
+        if: runner.os != 'Windows'
+        run: |
+          npm install -g @lmctl-ai/lmctl@staging || true
+          git clone --depth 1 https://github.com/lmctl-ai/lmconn.git ../lmconn || true
+          if command -v lmscript >/dev/null 2>&1; then
+            lmscript install github:lmctl-ai/lmcurl@latest || true
+          fi
+
+      - name: Run Integration Tests (POSIX)
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x ./tests/integration-test.sh
+          ./tests/integration-test.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: publish release
+    if: always() && !cancelled() && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate Checksums
+        run: |
+          cd dist
+          sha256sum lmsaml-* > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Publish Release to GitHub
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="0.1.0"
+          TAG="${GITHUB_REF_NAME}"
+          if [[ "$GITHUB_REF" == "refs/heads/main" ]] || [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_REF_NAME" == "main" ]]; then
+            TAG="v${VERSION}"
+          fi
+
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Uploading assets to existing release $TAG..."
+            gh release upload "$TAG" -R "$GITHUB_REPOSITORY" --clobber dist/*
+            gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --latest --prerelease=false
+          else
+            echo "Creating new release $TAG..."
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --latest --title "lmsaml ${TAG#v}" --generate-notes dist/*
+          fi
+
+      - name: Verify release with lmscript
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm install -g @lmctl-ai/lmctl@staging || true
+          if command -v lmscript >/dev/null 2>&1; then
+            lmscript install "github:$GITHUB_REPOSITORY@latest"
+          fi
