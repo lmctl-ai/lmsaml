@@ -74,7 +74,11 @@ jobs:
       - name: Run Go unit tests
         shell: bash
         run: |
-          CGO_ENABLED=0 go test ./cmd/lmsaml/... ./samlidp/...
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            CGO_ENABLED=0 go test ./cmd/lmsaml/...
+          else
+            CGO_ENABLED=0 go test ./cmd/lmsaml/... ./samlidp/...
+          fi
 
       - name: Setup Node and lmctl (POSIX)
         if: runner.os != 'Windows' && matrix.name != 'macos-arm64'
