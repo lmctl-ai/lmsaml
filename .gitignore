@@ -5,6 +5,6 @@ vendor/
 # IDE-specific settings
 .idea
 .vscode
-lmsaml
-lmsaml.exe
-dist/
+/lmsaml
+/lmsaml.exe
+/dist/
