@@ -2,6 +2,8 @@
 
 `lmsaml` is a pure-Go (`CGO_ENABLED=0`), zero-dependency single-binary SAML 2.0 server and `lmcode` host built on [`crewjam/saml`](https://github.com/crewjam/saml) and [`lmctl-ai/lmcode-go`](https://github.com/lmctl-ai/lmcode-go).
 
+**Documentation:** [Quick reference](https://www.lmctl.com/tools/lmsaml/) · [LLM skill](https://www.lmctl.com/tools/lmsaml/skill.html) · [Guide](https://www.lmctl.com/tools/lmsaml/guide.html) · [Reference](https://www.lmctl.com/tools/lmsaml/reference.html)
+
 ## Key Capabilities
 
 1. **Single-Binary Turnkey SAML 2.0 IdP & SP (`./lmsaml --port 8080 --rest-port 8081`)**:
